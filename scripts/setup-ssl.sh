@@ -24,7 +24,7 @@ mkdir -p ./certbot/www
 # Request SSL certificate
 echo "Requesting SSL certificate for $DOMAIN and www.$DOMAIN..."
 
-docker compose run --rm certbot certonly \
+docker compose run --rm --entrypoint "certbot" certbot certonly \
     --webroot \
     --webroot-path=/var/www/certbot \
     --email $EMAIL \

@@ -86,13 +86,13 @@ ssh root@VM_IP
 
 ```bash
 # Download the setup script
-wget https://raw.githubusercontent.com/YOUR_USERNAME/maxiscoding/main/scripts/setup-vm.sh
+wget https://raw.githubusercontent.com/zaytsev-mxm/maxiscoding/main/scripts/setup-vm.sh
 
 # Make it executable
 chmod +x setup-vm.sh
 
 # Run the setup script
-./setup-vm.sh
+sudo ./setup-vm.sh
 ```
 
 This script will:
