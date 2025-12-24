@@ -1,0 +1,58 @@
+name: Deploy to VM
+
+on:
+  workflow_run:
+    workflows: ["Build and Push Docker Image"]
+    types:
+      - completed
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Docker image tag to deploy'
+        required: false
+        default: 'latest'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.VM_IP }} >> ~/.ssh/known_hosts
+
+      - name: Copy deployment files to VM
+        run: |
+          ssh deployer@${{ secrets.VM_IP }} "mkdir -p /opt/maxiscoding"
+          scp docker-compose.yml deployer@${{ secrets.VM_IP }}:/opt/maxiscoding/
+          scp -r nginx deployer@${{ secrets.VM_IP }}:/opt/maxiscoding/
+          scp scripts/deploy.sh deployer@${{ secrets.VM_IP }}:/opt/maxiscoding/
+
+      - name: Deploy application
+        env:
+          IMAGE_TAG: ${{ github.event.inputs.image_tag || 'latest' }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ssh deployer@${{ secrets.VM_IP }} << 'EOF'
+            cd /opt/maxiscoding
+            export GITHUB_TOKEN="${{ secrets.GITHUB_TOKEN }}"
+            chmod +x deploy.sh
+            ./deploy.sh ${{ env.IMAGE_TAG }} ${{ github.repository_owner }}
+          EOF
+
+      - name: Verify deployment
+        run: |
+          ssh deployer@${{ secrets.VM_IP }} "cd /opt/maxiscoding && docker compose ps"
+
+      - name: Cleanup SSH
+        if: always()
+        run: rm -f ~/.ssh/id_rsa

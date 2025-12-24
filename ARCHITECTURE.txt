@@ -1,0 +1,236 @@
+DEPLOYMENT ARCHITECTURE - maxiscoding.dev
+=========================================
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│                          GITHUB REPOSITORY                               │
+│  ┌────────────┐  ┌────────────┐  ┌────────────┐  ┌────────────┐       │
+│  │ Source Code│  │   Docker   │  │   Nginx    │  │  Scripts   │       │
+│  │  (Next.js) │  │   Configs  │  │   Configs  │  │ (Shell)    │       │
+│  └─────┬──────┘  └─────┬──────┘  └─────┬──────┘  └─────┬──────┘       │
+│        │               │               │               │               │
+│        └───────────────┴───────────────┴───────────────┘               │
+│                              │                                          │
+│                              │ Push to main                             │
+│                              ▼                                          │
+│                   ┌──────────────────────┐                             │
+│                   │  GITHUB ACTIONS      │                             │
+│                   │  ┌────────────────┐  │                             │
+│                   │  │  Build Image   │  │                             │
+│                   │  └────────┬───────┘  │                             │
+│                   │           │          │                             │
+│                   │           ▼          │                             │
+│                   │  ┌────────────────┐  │                             │
+│                   │  │ Push to GHCR   │  │                             │
+│                   │  └────────┬───────┘  │                             │
+│                   │           │          │                             │
+│                   │           ▼          │                             │
+│                   │  ┌────────────────┐  │                             │
+│                   │  │  Deploy to VM  │  │                             │
+│                   │  └────────┬───────┘  │                             │
+│                   └───────────┼──────────┘                             │
+└───────────────────────────────┼────────────────────────────────────────┘
+                                │
+                                │ SSH Deploy
+                                │
+┌───────────────────────────────▼────────────────────────────────────────┐
+│                      GOOGLE CLOUD VM (Debian)                           │
+│                                                                         │
+│  ┌───────────────────────────────────────────────────────────────┐    │
+│  │                    Docker Network (Bridge)                     │    │
+│  │                                                                │    │
+│  │  ┌─────────────────────────────────────────────────────────┐  │    │
+│  │  │              Nginx Container (Alpine)                   │  │    │
+│  │  │  ┌──────────────┐                                       │  │    │
+│  │  │  │  Port 80/443 │◄─────── Internet Traffic            │  │    │
+│  │  │  └──────┬───────┘                                       │  │    │
+│  │  │         │                                               │  │    │
+│  │  │         │ ┌──────────────────────────────────┐         │  │    │
+│  │  │         │ │  SSL Certificate Termination     │         │  │    │
+│  │  │         │ │  /etc/letsencrypt/...            │         │  │    │
+│  │  │         │ └──────────────────────────────────┘         │  │    │
+│  │  │         │                                               │  │    │
+│  │  │         │ ┌──────────────────────────────────┐         │  │    │
+│  │  │         └▶│   Reverse Proxy                  │         │  │    │
+│  │  │           │   Security Headers               │         │  │    │
+│  │  │           │   Gzip Compression               │         │  │    │
+│  │  │           │   Static File Caching            │         │  │    │
+│  │  │           └─────────┬────────────────────────┘         │  │    │
+│  │  └─────────────────────┼──────────────────────────────────┘  │    │
+│  │                        │ http://nextjs:3000                  │    │
+│  │                        │                                     │    │
+│  │  ┌─────────────────────▼──────────────────────────────────┐  │    │
+│  │  │            Next.js Container (Alpine)                  │  │    │
+│  │  │  ┌──────────────────────────────────────────────────┐  │  │    │
+│  │  │  │  Next.js Standalone Server (Port 3000)           │  │  │    │
+│  │  │  │  - React 19                                      │  │  │    │
+│  │  │  │  - Next.js 16.1.1                                │  │  │    │
+│  │  │  │  - Production Build                              │  │  │    │
+│  │  │  │  - Non-root User (nextjs:nodejs)                 │  │  │    │
+│  │  │  └──────────────────────────────────────────────────┘  │  │    │
+│  │  └────────────────────────────────────────────────────────┘  │    │
+│  │                                                                │    │
+│  │  ┌─────────────────────────────────────────────────────────┐  │    │
+│  │  │            Certbot Container                            │  │    │
+│  │  │  - Auto-renews SSL certificates every 12h              │  │    │
+│  │  │  - Writes to /etc/letsencrypt (shared volume)          │  │    │
+│  │  │  - Serves .well-known/acme-challenge                   │  │    │
+│  │  └─────────────────────────────────────────────────────────┘  │    │
+│  │                                                                │    │
+│  └────────────────────────────────────────────────────────────────┘    │
+│                                                                         │
+│  ┌────────────────────────────────────────────────────────────────┐   │
+│  │                     Volumes (Persistent Data)                   │   │
+│  │  - ./nginx/nginx.conf         → Nginx main config              │   │
+│  │  - ./nginx/conf.d/            → Nginx site configs             │   │
+│  │  - ./certbot/conf/            → SSL certificates               │   │
+│  │  - ./certbot/www/             → ACME challenge files           │   │
+│  └────────────────────────────────────────────────────────────────┘   │
+│                                                                         │
+│  ┌────────────────────────────────────────────────────────────────┐   │
+│  │                         Firewall (UFW)                          │   │
+│  │  - Port 22  (SSH)          ✓ Allowed                           │   │
+│  │  - Port 80  (HTTP)         ✓ Allowed                           │   │
+│  │  - Port 443 (HTTPS)        ✓ Allowed                           │   │
+│  │  - Port 3000 (Next.js)     ✗ Blocked (internal only)           │   │
+│  └────────────────────────────────────────────────────────────────┘   │
+│                                                                         │
+│  ┌────────────────────────────────────────────────────────────────┐   │
+│  │                      File Structure on VM                       │   │
+│  │  /opt/maxiscoding/                                              │   │
+│  │  ├── docker-compose.yml                                         │   │
+│  │  ├── nginx/                                                     │   │
+│  │  ├── certbot/                                                   │   │
+│  │  ├── scripts/                                                   │   │
+│  │  └── .env.production                                            │   │
+│  └────────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────────┘
+                                │
+                                │ HTTPS (443)
+                                │
+                                ▼
+                    ┌──────────────────────┐
+                    │   Internet Users     │
+                    │  maxiscoding.dev     │
+                    └──────────────────────┘
+
+
+WORKFLOW DIAGRAM
+================
+
+Local Development (No Docker)
+────────────────────────────
+Developer Machine
+    │
+    ├─ npm run dev (Port 3000)
+    │
+    └─ Works exactly as before!
+
+
+Production Deployment
+────────────────────
+
+1. Developer pushes to GitHub
+   │
+   ├─ Commit changes
+   └─ git push origin main
+      │
+      ▼
+
+2. GitHub Actions: Build
+   │
+   ├─ Checkout code
+   ├─ Build Docker image (multi-stage)
+   ├─ Push to ghcr.io/maxzaytsev/maxiscoding:latest
+   └─ Trigger deploy workflow
+      │
+      ▼
+
+3. GitHub Actions: Deploy
+   │
+   ├─ SSH to VM
+   ├─ Copy docker-compose.yml
+   ├─ Copy nginx configs
+   ├─ Pull new Docker image
+   ├─ docker compose down
+   ├─ docker compose up -d
+   └─ Verify deployment
+      │
+      ▼
+
+4. Application Running
+   │
+   ├─ Nginx handles SSL/TLS
+   ├─ Nginx proxies to Next.js
+   ├─ Next.js serves application
+   ├─ Certbot renews certificates
+   └─ Users access via HTTPS
+
+
+SSL SETUP (One-time)
+───────────────────
+
+1. Initial Deployment (HTTP)
+   │
+   ├─ Nginx uses default-nossl.conf
+   └─ Application accessible via HTTP
+      │
+      ▼
+
+2. Run SSL Setup Workflow (GitHub Actions)
+   │
+   ├─ Temporarily enable HTTP for validation
+   ├─ Certbot requests certificate
+   ├─ Let's Encrypt validates domain
+   ├─ Certificates saved to /etc/letsencrypt
+   ├─ Switch to default.conf (with SSL)
+   └─ Reload Nginx
+      │
+      ▼
+
+3. Application Running (HTTPS)
+   │
+   ├─ HTTP redirects to HTTPS
+   ├─ SSL certificate installed
+   ├─ Auto-renewal configured
+   └─ Secure connection established
+
+
+CONTINUOUS DEPLOYMENT
+────────────────────
+
+Push to main → Build → Deploy → Live
+
+Automatic:
+  - Code changes
+  - Dependency updates
+  - Configuration changes
+
+Manual Workflows:
+  - SSL certificate setup (one-time)
+  - Nginx config updates (when needed)
+
+
+MONITORING & MAINTENANCE
+────────────────────────
+
+SSH to VM:
+  ssh deployer@VM_IP
+
+Check Status:
+  cd /opt/maxiscoding
+  docker compose ps
+
+View Logs:
+  docker compose logs -f nextjs
+  docker compose logs -f nginx
+  docker compose logs -f certbot
+
+Restart Services:
+  docker compose restart
+
+Update Application:
+  docker compose pull
+  docker compose up -d
+
+Clean Up:
+  docker system prune -f

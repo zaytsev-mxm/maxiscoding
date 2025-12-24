@@ -1,0 +1,53 @@
+name: Update Nginx Configuration
+
+on:
+  workflow_dispatch:
+    inputs:
+      use_ssl:
+        description: 'Use SSL configuration (true/false)'
+        required: true
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+
+jobs:
+  update-nginx:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.VM_IP }} >> ~/.ssh/known_hosts
+
+      - name: Copy Nginx configuration to VM
+        run: |
+          scp -r nginx deployer@${{ secrets.VM_IP }}:/opt/maxiscoding/
+          scp scripts/update-nginx.sh deployer@${{ secrets.VM_IP }}:/opt/maxiscoding/
+
+      - name: Update and reload Nginx
+        run: |
+          ssh deployer@${{ secrets.VM_IP }} << 'EOF'
+            cd /opt/maxiscoding
+            chmod +x update-nginx.sh
+            ./update-nginx.sh ${{ github.event.inputs.use_ssl }}
+          EOF
+
+      - name: Verify Nginx status
+        run: |
+          ssh deployer@${{ secrets.VM_IP }} << 'EOF'
+            cd /opt/maxiscoding
+            docker compose ps nginx
+            echo "Nginx configuration updated successfully!"
+          EOF
+
+      - name: Cleanup SSH
+        if: always()
+        run: rm -f ~/.ssh/id_rsa

@@ -1,0 +1,74 @@
+name: SSL Certificate Setup
+
+on:
+  workflow_dispatch:
+    inputs:
+      email:
+        description: 'Email for SSL certificate notifications'
+        required: true
+        default: 'admin@maxiscoding.dev'
+
+jobs:
+  setup-ssl:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.VM_IP }} >> ~/.ssh/known_hosts
+
+      - name: Copy SSL setup script to VM
+        run: |
+          scp scripts/setup-ssl.sh deployer@${{ secrets.VM_IP }}:/opt/maxiscoding/
+
+      - name: Ensure non-SSL Nginx config is active
+        run: |
+          ssh deployer@${{ secrets.VM_IP }} << 'EOF'
+            cd /opt/maxiscoding
+            # Temporarily use non-SSL config for certificate verification
+            if [ -f nginx/conf.d/default.conf ]; then
+              mv nginx/conf.d/default.conf nginx/conf.d/default.conf.backup
+            fi
+            cp nginx/conf.d/default-nossl.conf nginx/conf.d/default.conf
+            docker compose exec nginx nginx -s reload || docker compose restart nginx
+          EOF
+
+      - name: Obtain SSL certificates
+        run: |
+          ssh deployer@${{ secrets.VM_IP }} << 'EOF'
+            cd /opt/maxiscoding
+            chmod +x setup-ssl.sh
+            # Update email in script
+            sed -i 's/admin@maxiscoding.dev/${{ github.event.inputs.email }}/g' setup-ssl.sh
+            ./setup-ssl.sh
+          EOF
+
+      - name: Enable SSL Nginx configuration
+        run: |
+          ssh deployer@${{ secrets.VM_IP }} << 'EOF'
+            cd /opt/maxiscoding
+            # Restore SSL config
+            if [ -f nginx/conf.d/default.conf.backup ]; then
+              mv nginx/conf.d/default.conf.backup nginx/conf.d/default.conf
+            fi
+            # Reload Nginx with SSL config
+            docker compose exec nginx nginx -t && docker compose exec nginx nginx -s reload
+          EOF
+
+      - name: Verify SSL setup
+        run: |
+          ssh deployer@${{ secrets.VM_IP }} << 'EOF'
+            cd /opt/maxiscoding
+            docker compose exec nginx ls -la /etc/letsencrypt/live/maxiscoding.dev/
+            echo "SSL certificates installed successfully!"
+          EOF
+
+      - name: Cleanup SSH
+        if: always()
+        run: rm -f ~/.ssh/id_rsa
