@@ -40,7 +40,7 @@ maxiscoding/
 │       ├── default.conf       # HTTPS configuration
 │       └── default-nossl.conf # HTTP-only configuration
 ├── scripts/
-│   ├── setup-system.sh       # System setup (run as root)
+│   ├── setup-system.sh       # System setup (run as admin with sudo)
 │   ├── setup-app.sh          # App setup (run as deployer)
 │   ├── setup-ssl.sh          # SSL certificate setup
 │   ├── deploy.sh             # Deployment script

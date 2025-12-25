@@ -1,7 +1,7 @@
 services:
   nextjs:
     container_name: maxiscoding-app
-    image: ghcr.io/${GITHUB_REPOSITORY_OWNER:-maxzaytsev}/maxiscoding:${IMAGE_TAG:-latest}
+    image: ghcr.io/${GITHUB_REPOSITORY_OWNER:-zaytsev-mxm}/maxiscoding:${IMAGE_TAG:-latest}
     restart: unless-stopped
     environment:
       - NODE_ENV=production

@@ -12,7 +12,7 @@ echo "=========================================="
 
 APP_DIR="/opt/maxiscoding"
 IMAGE_TAG="${1:-latest}"
-GITHUB_REPOSITORY_OWNER="${2:-maxzaytsev}"
+GITHUB_REPOSITORY_OWNER="${2:-zaytsev-mxm}"
 
 cd $APP_DIR
 
