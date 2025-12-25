@@ -204,6 +204,30 @@ GitHub Container Registry (ghcr.io) is automatically available. Ensure your repo
    docker compose logs nginx
    ```
 
+   **Troubleshooting: Nginx in restart loop**
+
+   If `docker compose ps` shows nginx with status `Restarting`, check the logs:
+   ```bash
+   docker compose logs nginx
+   ```
+
+   If you see an error like:
+   ```
+   cannot load certificate "/etc/letsencrypt/live/maxiscoding.dev/fullchain.pem": BIO_new_file() failed
+   ```
+
+   This means nginx is using the SSL configuration but certificates don't exist yet. Fix it by switching to the non-SSL config:
+   ```bash
+   cp nginx/conf.d/default-nossl.conf nginx/conf.d/default.conf
+   docker compose restart nginx
+   ```
+
+   Verify nginx is now running:
+   ```bash
+   docker compose ps
+   # nginx should show "Up" instead of "Restarting"
+   ```
+
 5. **Test the Application**
    - Visit http://maxiscoding.dev in your browser
    - You should see your Next.js application
@@ -237,6 +261,27 @@ ssh deployer@VM_IP
 sudo ls -la /opt/maxiscoding/certbot/conf/live/maxiscoding.dev/
 
 # Test HTTPS
+curl -I https://maxiscoding.dev
+```
+
+**Troubleshooting: Certificates exist but HTTPS fails**
+
+If certificates exist but `curl -I https://maxiscoding.dev` fails with "Couldn't connect to server", nginx may still be using the non-SSL configuration (especially if you manually switched to it during initial deployment).
+
+Restore the SSL configuration:
+```bash
+cd /opt/maxiscoding
+
+# Download the SSL config from the repository
+wget -O nginx/conf.d/default.conf https://raw.githubusercontent.com/zaytsev-mxm/maxiscoding/main/nginx/conf.d/default.conf
+
+# Restart nginx
+docker compose restart nginx
+
+# Verify nginx is running (not restarting)
+docker compose ps
+
+# Test HTTPS again
 curl -I https://maxiscoding.dev
 ```
 
