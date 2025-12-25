@@ -53,11 +53,17 @@ maxiscoding/
 
 ## Prerequisites
 
+### SSH Keys (Do This First)
+
+Before proceeding, set up your SSH keys by following the [SSH Setup Guide](./SETTING_UP_SSH_CONNECTION.md). This creates:
+- **Admin key** (`~/.ssh/gcp_admin_ed25519`) - for system setup
+- **Deployer key** (`~/.ssh/gcp_deployer_ed25519`) - for GitHub Actions
+
 ### On Your Local Machine
 
 - Git installed
 - GitHub account with repository access
-- SSH key pair for VM access
+- SSH keys configured (see above)
 
 ### Google Cloud VM Requirements
 
@@ -73,6 +79,7 @@ maxiscoding/
 - Domain: maxiscoding.dev
 - DNS A record pointing to VM IP address
 - DNS A record for www.maxiscoding.dev pointing to VM IP address
+  - OR a DNS CNAME record for www pointing to maxiscoding.dev
 
 ## Initial VM Setup
 
@@ -128,9 +135,6 @@ This script will:
 docker --version
 docker compose version
 
-# Check firewall status
-sudo ufw status
-
 # Verify application directory
 ls -la /opt/maxiscoding
 ```
@@ -146,16 +150,10 @@ In your GitHub repository, go to Settings > Secrets and variables > Actions, and
    Example: 34.123.45.67
    ```
 
-2. **SSH_PRIVATE_KEY**: Private SSH key for the deployer user
+2. **SSH_PRIVATE_KEY**: The deployer's private key (created in [SSH Setup](./SETTING_UP_SSH_CONNECTION.md))
    ```bash
-   # Generate a new SSH key pair (if needed)
-   ssh-keygen -t ed25519 -C "github-actions@maxiscoding.dev" -f ~/.ssh/maxiscoding_deploy
-
    # Copy the private key content (paste this into GitHub secret)
-   cat ~/.ssh/maxiscoding_deploy
-
-   # Add the public key to VM (see Step 3 above)
-   cat ~/.ssh/maxiscoding_deploy.pub
+   cat ~/.ssh/gcp_deployer_ed25519
    ```
 
 ### Step 2: Enable GitHub Actions
@@ -430,10 +428,8 @@ echo | openssl s_client -servername maxiscoding.dev -connect maxiscoding.dev:443
    docker compose ps
    ```
 
-2. **Check firewall rules:**
-   ```bash
-   sudo ufw status
-   ```
+2. **Check GCP firewall rules** in the GCP Console (VPC network > Firewall)
+   - Ensure ports 22, 80, 443 are allowed
 
 3. **Check Nginx logs:**
    ```bash

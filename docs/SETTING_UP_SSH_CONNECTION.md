@@ -61,13 +61,11 @@ ssh gcp-admin
 
 ## Step 5: For GitHub Actions
 
-Add these secrets to your repository:
+Add these secrets to your repository (Settings > Secrets and variables > Actions):
 
-**GCP_SSH_PRIVATE_KEY:**
+**SSH_PRIVATE_KEY:**
 ```bash
 cat ~/.ssh/gcp_deployer_ed25519
 ```
 
-**GCP_HOST:** Your VM's external IP
-
-**GCP_USER:** `deployer`
+**VM_IP:** Your VM's external IP address
