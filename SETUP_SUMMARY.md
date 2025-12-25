@@ -58,12 +58,18 @@ A complete production-ready deployment infrastructure for your Next.js applicati
 
 ### Deployment Scripts (4 files)
 
-8. **`/Users/maxzaytsev/dev/js/maxiscoding/scripts/setup-vm.sh`**
-   - One-time VM setup script
+8. **`/Users/maxzaytsev/dev/js/maxiscoding/scripts/setup-system.sh`**
+   - System-level setup script (run as root)
    - Installs Docker, Docker Compose
    - Creates deployer user
    - Configures firewall
    - Sets up application directories
+
+8b. **`/Users/maxzaytsev/dev/js/maxiscoding/scripts/setup-app.sh`**
+    - Application setup script (run as deployer)
+    - Verifies Docker access
+    - Creates certbot directories
+    - Validates environment is ready
 
 9. **`/Users/maxzaytsev/dev/js/maxiscoding/scripts/setup-ssl.sh`**
    - Obtains SSL certificates from Let's Encrypt
@@ -237,9 +243,10 @@ A complete production-ready deployment infrastructure for your Next.js applicati
 
 ```
 1. Setup VM
-   ├─ Run setup-vm.sh
+   ├─ Run setup-system.sh (as root)
    ├─ Create deployer user
-   └─ Configure firewall
+   ├─ Configure firewall
+   └─ Run setup-app.sh (as deployer)
 
 2. Configure GitHub
    ├─ Add VM_IP secret
@@ -292,10 +299,19 @@ Configure in GitHub: Settings > Secrets and variables > Actions
 
 ### Step 1: VM Setup
 ```bash
+# As root
 ssh root@YOUR_VM_IP
-wget https://raw.githubusercontent.com/YOUR_USERNAME/maxiscoding/main/scripts/setup-vm.sh
-chmod +x setup-vm.sh
-./setup-vm.sh
+wget https://raw.githubusercontent.com/YOUR_USERNAME/maxiscoding/main/scripts/setup-system.sh
+chmod +x setup-system.sh
+sudo ./setup-system.sh
+
+# Add SSH key, then as deployer
+echo "YOUR_KEY" >> /home/deployer/.ssh/authorized_keys
+su - deployer
+cd /opt/maxiscoding
+wget https://raw.githubusercontent.com/YOUR_USERNAME/maxiscoding/main/scripts/setup-app.sh
+chmod +x setup-app.sh
+./setup-app.sh
 ```
 
 ### Step 2: SSH Key
@@ -409,7 +425,7 @@ docker compose logs certbot   # Check Certbot logs
 ## Next Steps
 
 1. **Read**: Start with `README.deployment.md` for quick setup
-2. **Setup VM**: Run `setup-vm.sh` on your VM
+2. **Setup VM**: Run `setup-system.sh` as root, then `setup-app.sh` as deployer
 3. **Configure**: Add GitHub secrets
 4. **Deploy**: Push code to trigger deployment
 5. **SSL**: Run SSL setup workflow

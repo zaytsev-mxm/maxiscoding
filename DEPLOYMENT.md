@@ -40,7 +40,8 @@ maxiscoding/
 │       ├── default.conf       # HTTPS configuration
 │       └── default-nossl.conf # HTTP-only configuration
 ├── scripts/
-│   ├── setup-vm.sh           # Initial VM setup script
+│   ├── setup-system.sh       # System setup (run as root)
+│   ├── setup-app.sh          # App setup (run as deployer)
 │   ├── setup-ssl.sh          # SSL certificate setup
 │   ├── deploy.sh             # Deployment script
 │   └── update-nginx.sh       # Nginx update script
@@ -75,50 +76,50 @@ maxiscoding/
 
 ## Initial VM Setup
 
-### Step 1: Access Your VM
+### Step 1: Add SSH Keys to GCP VM Metadata
+
+In the GCP Console, add SSH public keys to your VM's metadata. GCP automatically creates users from these keys.
+
+Add two keys:
+1. **Admin key** (for system setup): `admin:ssh-ed25519 AAAA... your-email`
+2. **Deployer key** (for GitHub Actions): `deployer:ssh-ed25519 AAAA... your-email`
+
+### Step 2: Run System Setup (as admin)
 
 ```bash
-# SSH into your VM (replace VM_IP with your actual IP)
-ssh root@VM_IP
-```
+# SSH as admin
+ssh -i ~/.ssh/gcp_admin_ed25519 admin@VM_IP
 
-### Step 2: Download and Run Setup Script
-
-```bash
-# Download the setup script
-wget https://raw.githubusercontent.com/zaytsev-mxm/maxiscoding/main/scripts/setup-vm.sh
-
-# Make it executable
-chmod +x setup-vm.sh
-
-# Run the setup script
-sudo ./setup-vm.sh
+# Download and run system setup
+wget https://raw.githubusercontent.com/zaytsev-mxm/maxiscoding/main/scripts/setup-system.sh
+chmod +x setup-system.sh
+sudo ./setup-system.sh
 ```
 
 This script will:
-- Update system packages
+- Verify the `deployer` user exists
 - Install Docker and Docker Compose
-- Create a `deployer` user
-- Set up the application directory at `/opt/maxiscoding`
-- Configure firewall rules
-- Create necessary directories for Certbot
+- Add `deployer` to the docker group
+- Create `/opt/maxiscoding` owned by `deployer`
 - Set up Docker log rotation
-- Create a systemd service for automatic container startup
 
-### Step 3: Add SSH Key for Deployment
+### Step 3: Run Application Setup (as deployer)
 
 ```bash
-# Switch to deployer user
-su - deployer
+# SSH as deployer (new session for docker group to take effect)
+ssh -i ~/.ssh/gcp_deployer_ed25519 deployer@VM_IP
 
-# Create .ssh directory if it doesn't exist
-mkdir -p ~/.ssh
-chmod 700 ~/.ssh
-
-# Add your public SSH key to authorized_keys
-echo "YOUR_PUBLIC_SSH_KEY" >> ~/.ssh/authorized_keys
-chmod 600 ~/.ssh/authorized_keys
+# Download and run app setup
+cd /opt/maxiscoding
+wget https://raw.githubusercontent.com/zaytsev-mxm/maxiscoding/main/scripts/setup-app.sh
+chmod +x setup-app.sh
+./setup-app.sh
 ```
+
+This script will:
+- Verify Docker access
+- Create certbot directories
+- Create log directories
 
 ### Step 4: Verify Setup
 

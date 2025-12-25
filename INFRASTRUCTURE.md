@@ -23,7 +23,8 @@ Infrastructure Files:
 │       ├── default.conf       # HTTPS config (with SSL)
 │       └── default-nossl.conf # HTTP config (without SSL)
 ├── scripts/
-│   ├── setup-vm.sh           # Initial VM setup
+│   ├── setup-system.sh       # System setup (run as root)
+│   ├── setup-app.sh          # App setup (run as deployer)
 │   ├── setup-ssl.sh          # SSL certificate setup
 │   ├── deploy.sh             # Deployment script
 │   └── update-nginx.sh       # Nginx config update
@@ -121,21 +122,33 @@ docker run -p 3000:3000 maxiscoding:test
 
 ### Initial Setup (One-time)
 
-1. Set up VM:
+1. Set up VM (as root):
    ```bash
    ssh root@VM_IP
-   wget https://raw.githubusercontent.com/YOUR_USERNAME/maxiscoding/main/scripts/setup-vm.sh
-   chmod +x setup-vm.sh
-   ./setup-vm.sh
+   wget https://raw.githubusercontent.com/YOUR_USERNAME/maxiscoding/main/scripts/setup-system.sh
+   chmod +x setup-system.sh
+   sudo ./setup-system.sh
    ```
 
-2. Add SSH key to deployer user on VM
+2. Add SSH key to deployer user:
+   ```bash
+   echo "YOUR_PUBLIC_KEY" >> /home/deployer/.ssh/authorized_keys
+   ```
 
-3. Configure GitHub secrets (VM_IP, SSH_PRIVATE_KEY)
+3. Run app setup as deployer:
+   ```bash
+   su - deployer
+   cd /opt/maxiscoding
+   wget https://raw.githubusercontent.com/YOUR_USERNAME/maxiscoding/main/scripts/setup-app.sh
+   chmod +x setup-app.sh
+   ./setup-app.sh
+   ```
 
-4. Deploy application (via GitHub Actions)
+4. Configure GitHub secrets (VM_IP, SSH_PRIVATE_KEY)
 
-5. Set up SSL certificates (via GitHub Actions)
+5. Deploy application (via GitHub Actions)
+
+6. Set up SSL certificates (via GitHub Actions)
 
 ### Regular Deployment
 

@@ -25,18 +25,30 @@ Use this checklist to ensure all steps are completed correctly.
 
 ## Initial Setup (One-Time)
 
-### Step 1: VM Setup
+### Step 1: System Setup (as root)
 - [ ] SSH into VM as root: `ssh root@VM_IP`
-- [ ] Download setup script:
+- [ ] Download system setup script:
   ```bash
-  wget https://raw.githubusercontent.com/YOUR_USERNAME/maxiscoding/main/scripts/setup-vm.sh
+  wget https://raw.githubusercontent.com/YOUR_USERNAME/maxiscoding/main/scripts/setup-system.sh
   ```
-- [ ] Make script executable: `chmod +x setup-vm.sh`
-- [ ] Run setup script: `./setup-vm.sh`
+- [ ] Make script executable: `chmod +x setup-system.sh`
+- [ ] Run setup script: `sudo ./setup-system.sh`
 - [ ] Verify Docker installed: `docker --version`
 - [ ] Verify Docker Compose installed: `docker compose version`
 - [ ] Verify deployer user created: `id deployer`
 - [ ] Verify firewall configured: `sudo ufw status`
+
+### Step 1b: App Setup (as deployer)
+- [ ] Add SSH key: `echo "YOUR_KEY" >> /home/deployer/.ssh/authorized_keys`
+- [ ] Switch to deployer user: `su - deployer`
+- [ ] Download app setup script:
+  ```bash
+  cd /opt/maxiscoding
+  wget https://raw.githubusercontent.com/YOUR_USERNAME/maxiscoding/main/scripts/setup-app.sh
+  ```
+- [ ] Make script executable: `chmod +x setup-app.sh`
+- [ ] Run app setup: `./setup-app.sh`
+- [ ] Verify certbot directories created: `ls -la /opt/maxiscoding/certbot`
 
 ### Step 2: SSH Key Setup
 - [ ] Generate SSH key pair on local machine:

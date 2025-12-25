@@ -53,7 +53,8 @@ This document summarizes the deployment infrastructure set up for **maxiscoding.
 
 | File | Purpose |
 |------|---------|
-| `scripts/setup-vm.sh` | One-time VM initialization |
+| `scripts/setup-system.sh` | System setup (run as root) |
+| `scripts/setup-app.sh` | App setup (run as deployer) |
 | `scripts/setup-ssl.sh` | SSL certificate acquisition via Certbot |
 | `scripts/deploy.sh` | Application deployment (pull image, restart containers) |
 | `scripts/update-nginx.sh` | Nginx configuration updates |
@@ -122,17 +123,28 @@ services:
 - Reverse proxy to Next.js with WebSocket support
 - Static asset caching for `/_next/static`
 
-### 4. VM Setup Script (`scripts/setup-vm.sh`)
+### 4. VM Setup Scripts
 
-One-time setup for a fresh Debian VM:
+The VM setup is split into two scripts for proper privilege separation:
 
-1. **System updates** - `apt-get update && upgrade`
-2. **Docker installation** - Official Docker CE + Compose plugin
-3. **User creation** - `deployer` user with Docker permissions
-4. **Directory structure** - `/opt/maxiscoding` with proper ownership
-5. **Firewall** - UFW allowing SSH (22), HTTP (80), HTTPS (443)
+#### `scripts/setup-system.sh` (run as admin with sudo)
+
+System-level setup. Assumes users already exist (created via GCP SSH metadata):
+
+1. **Verifies deployer user exists** - Fails if not created via GCP
+2. **System updates** - `apt-get update && upgrade`
+3. **Docker installation** - Official Docker CE + Compose plugin
+4. **Docker group** - Adds deployer to docker group
+5. **Directory structure** - `/opt/maxiscoding` owned by deployer
 6. **Docker log rotation** - 10MB max, 3 files retained
-7. **Systemd service** - Auto-start containers on boot
+
+#### `scripts/setup-app.sh` (run as deployer)
+
+Application-level setup (no sudo required):
+
+1. **Docker access verification** - Ensures deployer can use Docker
+2. **Certbot directories** - Creates SSL certificate directories
+3. **Log directories** - Creates application log directories
 
 ### 5. GitHub Actions Workflows
 
@@ -202,23 +214,30 @@ One-time setup for a fresh Debian VM:
 ### Initial Setup (One-time)
 
 ```bash
-# 1. On your VM (as root)
-curl -O https://raw.githubusercontent.com/YOUR_REPO/main/scripts/setup-vm.sh
-chmod +x setup-vm.sh
-./setup-vm.sh
+# 1. Add SSH keys to GCP VM metadata (creates admin + deployer users)
+#    admin:ssh-ed25519 AAAA...
+#    deployer:ssh-ed25519 AAAA...
 
-# 2. Add your SSH public key
-echo "ssh-rsa AAAA..." >> /home/deployer/.ssh/authorized_keys
-chmod 600 /home/deployer/.ssh/authorized_keys
+# 2. SSH as admin and run system setup
+ssh -i ~/.ssh/gcp_admin_ed25519 admin@VM_IP
+curl -O https://raw.githubusercontent.com/YOUR_REPO/main/scripts/setup-system.sh
+chmod +x setup-system.sh
+sudo ./setup-system.sh
 
-# 3. In GitHub repository settings
-#    Add secrets: VM_IP, SSH_PRIVATE_KEY
+# 3. SSH as deployer and run app setup (new session for docker group)
+ssh -i ~/.ssh/gcp_deployer_ed25519 deployer@VM_IP
+cd /opt/maxiscoding
+curl -O https://raw.githubusercontent.com/YOUR_REPO/main/scripts/setup-app.sh
+chmod +x setup-app.sh
+./setup-app.sh
 
-# 4. Push code to trigger first deployment
+# 4. In GitHub repository settings
+#    Add secrets: VM_IP, SSH_PRIVATE_KEY (deployer's private key)
+
+# 5. Push code to trigger first deployment
 git push origin main
 
-# 5. Run SSL Setup workflow from GitHub Actions UI
-#    (provide your email for certificate notifications)
+# 6. Run SSL Setup workflow from GitHub Actions UI
 ```
 
 ### Continuous Deployment
@@ -310,7 +329,8 @@ maxiscoding/
 ├── scripts/
 │   ├── deploy.sh
 │   ├── setup-ssl.sh
-│   ├── setup-vm.sh
+│   ├── setup-system.sh
+│   ├── setup-app.sh
 │   └── update-nginx.sh
 ├── next.config.ts              # Modified: added output: 'standalone'
 └── package.json

@@ -19,12 +19,20 @@ This is a quick start guide to get your Next.js application deployed to Google C
 # SSH into your VM as root
 ssh root@YOUR_VM_IP
 
-# Download and run setup script
-wget https://raw.githubusercontent.com/YOUR_USERNAME/maxiscoding/main/scripts/setup-vm.sh
-chmod +x setup-vm.sh
-./setup-vm.sh
+# Download and run system setup script
+wget https://raw.githubusercontent.com/YOUR_USERNAME/maxiscoding/main/scripts/setup-system.sh
+chmod +x setup-system.sh
+sudo ./setup-system.sh
 
-# The script will create a 'deployer' user and set up Docker
+# Add your SSH key for deployer user
+echo "YOUR_PUBLIC_KEY" >> /home/deployer/.ssh/authorized_keys
+
+# Switch to deployer and run app setup
+su - deployer
+cd /opt/maxiscoding
+wget https://raw.githubusercontent.com/YOUR_USERNAME/maxiscoding/main/scripts/setup-app.sh
+chmod +x setup-app.sh
+./setup-app.sh
 ```
 
 ### 2. Add SSH Key for GitHub Actions (One-time)
